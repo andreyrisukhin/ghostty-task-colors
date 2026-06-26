@@ -460,19 +460,21 @@ _ghostty_task_rgb() {
   case "${1:-}" in
     --help|-h)
       cat <<'EOF'
-Usage: task rgb [<suffix>] [<steps>] [<delay-seconds>]
-       task rgb stop
-       task rgb status
+Usage: task rainbow [<suffix>] [<steps>] [<delay-seconds>]
+       task rainbow stop
+       task rainbow status
 
 Starts a background Flexoki accent-gradient shift in the current Ghostty pane,
 then returns shell control immediately.
 The suffix defaults to 400 so the RGB cycle is visible without going too dark.
 
 Examples:
-  task rgb             shift at the default -400 shade
-  task rgb 850         shift through darker accent colors
-  task rgb 100 6 .02   shift through light colors, faster
-  task rgb stop        stop shifting this pane
+  task rainbow             shift at the default -400 shade
+  task rainbow 850         shift through darker accent colors
+  task rainbow 100 6 .02   shift through light colors, faster
+  task rainbow stop        stop shifting this pane
+
+`task rgb` remains an alias for `task rainbow`.
 EOF
       return
       ;;
@@ -956,13 +958,68 @@ _ghostty_task_global_shade() {
   echo 'note: apply only changes registered panes; preview-only <unregistered> panes are intentionally skipped'
 }
 
+_ghostty_task_brightness_word() {
+  local scope="${1:-pane}" word="${2:-}" suffix
+  case "$word" in
+    --help|-h)
+      if [[ "$scope" == global ]]; then
+        cat <<'EOF'
+Usage: task global [bright|dim|normal|status|<suffix>]
+
+Controls the default brightness for all registered panes and future panes.
+EOF
+      else
+        cat <<'EOF'
+Usage: task [bright|dim|normal] [suffix]
+
+Controls brightness for this pane only.
+  task bright       set this pane to suffix 400
+  task dim          set this pane to suffix 850
+  task normal       clear this pane's brightness override
+EOF
+      fi
+      return
+      ;;
+    bright|light)
+      suffix="${3:-400}"
+      ;;
+    dim|dark)
+      suffix="${3:-850}"
+      ;;
+    normal|clear|off)
+      if [[ "$scope" == global ]]; then
+        _ghostty_task_global_shade clear
+      else
+        _ghostty_task_shade clear
+      fi
+      return
+      ;;
+    status|'')
+      if [[ "$scope" == global ]]; then
+        _ghostty_task_global_shade status
+      else
+        _ghostty_task_shade status
+      fi
+      return
+      ;;
+    *)
+      suffix="$word"
+      ;;
+  esac
+  if [[ "$scope" == global ]]; then
+    _ghostty_task_global_shade "$suffix"
+  else
+    _ghostty_task_shade "$suffix"
+  fi
+}
+
 _ghostty_task_help() {
   local active_suffix key suffix
   active_suffix=$(_ghostty_task_active_suffix 2>/dev/null || :)
   [[ -n "$active_suffix" ]] || active_suffix=900
 
   cat <<'EOF'
-Usage: task [<name> | <color>[-suffix] | #rrggbb | clear | -p | rgb | shade | --help]
+Usage: task [<name> | <color>[-suffix] | #rrggbb | clear | -p | bright | dim | rainbow | --help]
 
 Tags the current Ghostty window with a Flexoki background color and title.
 With no args, prints the current task and its swatch.
@@ -993,10 +1050,15 @@ Other:
   #rrggbb        use exact hex color
   <other>        hashed -> one of the 8 accents
   clear|off      drop tag, restore dir-based color
+  bright [sfx]   brighten this pane (default suffix 400)
+  dim [sfx]      dim this pane (default suffix 850)
+  normal         clear this pane's brightness override
+  global ...     apply brightness controls to all panes
+  rainbow        start background accent-gradient transition
+  rainbow stop   stop background accent-gradient transition
   -p, --palette  preview every Flexoki color in a rendered grid
   tabs --help    show vertical categorized pane list controls
-  rgb --help     show accent-gradient transition controls
-  shade --help   show pane/global brightness controls for light/dark mode switching
+  shade --help   show low-level suffix controls
 
 Flexoki palette by Steph Ango: https://stephango.com/flexoki
 EOF
@@ -1023,12 +1085,32 @@ task() {
       _ghostty_task_palette
       return
       ;;
+    bright|light)
+      shift
+      _ghostty_task_brightness_word pane bright "$@"
+      return
+      ;;
+    dim|dark)
+      shift
+      _ghostty_task_brightness_word pane dim "$@"
+      return
+      ;;
+    normal)
+      shift
+      _ghostty_task_brightness_word pane normal "$@"
+      return
+      ;;
+    global)
+      shift
+      _ghostty_task_brightness_word global "$@"
+      return
+      ;;
     shade)
       shift
       _ghostty_task_shade "$@"
       return
       ;;
-    rgb)
+    rainbow|rgb)
       shift
       _ghostty_task_rgb "$@"
       return
@@ -1095,10 +1177,14 @@ _task() {
     '--help:show usage'
     '-p:preview all colors'
     '--palette:preview all colors'
-    'rgb:run accent-gradient transition'
-    'shade:preview/apply pane light/dark brightness'
+    'bright:brighten this pane'
+    'dim:dim this pane'
+    'normal:clear this pane brightness override'
+    'global:apply brightness controls to all panes'
+    'rainbow:run accent-gradient transition'
+    'rgb:alias for rainbow'
+    'shade:low-level suffix controls'
     'tabs:show vertical categorized pane list'
-    'global:apply shade to all panes'
     'status:show shade status'
   )
   _describe -t colors 'flexoki accent' colors
