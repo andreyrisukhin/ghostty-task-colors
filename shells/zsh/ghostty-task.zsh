@@ -240,6 +240,24 @@ _ghostty_task_snap_key() {
   print -r -- "$key"
 }
 
+_ghostty_task_explicit_color() {
+  local name="$1" suffix accent
+  [[ "$name" == paper || "$name" == black || "$name" == gray || "$name" == grey ]] && return 0
+  if [[ "$name" == base-<-> ]]; then
+    suffix="${name#base-}"
+    _ghostty_task_is_suffix "$suffix"
+    return
+  fi
+  for accent in "${_flexoki_task_accents[@]}"; do
+    if [[ "$name" == "$accent"-<-> ]]; then
+      suffix="${name#${accent}-}"
+      _ghostty_task_is_suffix "$suffix"
+      return
+    fi
+  done
+  return 1
+}
+
 _ghostty_task_swatch() {
   local hex="${1#\#}"
   local r=$((16#${hex:0:2})) g=$((16#${hex:2:2})) b=$((16#${hex:4:2}))
@@ -281,6 +299,10 @@ _ghostty_task_resolve() {
     print -r -- "$name"
     return
   fi
+  if _ghostty_task_explicit_color "$name"; then
+    print -r -- "${_flexoki_task_colors[$name]}"
+    return
+  fi
   local key suffix
   key=$(_ghostty_task_color_key "$name")
   suffix=$(_ghostty_task_active_suffix 2>/dev/null)
@@ -309,6 +331,10 @@ _ghostty_task_suggested_color() {
   local name="$1" suffix="$2"
   if [[ "$name" =~ ^#[0-9a-fA-F]{6}$ ]]; then
     print -r -- "$name"
+    return
+  fi
+  if _ghostty_task_explicit_color "$name"; then
+    print -r -- "${_flexoki_task_colors[$name]}"
     return
   fi
   local key
